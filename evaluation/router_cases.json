@@ -1,0 +1,410 @@
+[
+  {
+    "id": "weather_01",
+    "category": "weather",
+    "query": "帮我查2026-06-20东京的天气",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "weather_02",
+    "category": "weather",
+    "query": "2026-06-20大阪气温怎么样",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "大阪", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "weather_03",
+    "category": "weather",
+    "query": "我想2026-06-20从富山去东京，帮我看看天气",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "weather_04",
+    "category": "weather",
+    "query": "查一下2026-06-21东京会不会下雨",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京", "fx_date": "2026-06-21"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "weather_05",
+    "category": "weather",
+    "query": "2026-06-20富山湿度和风力如何",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "富山", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "weather_06",
+    "category": "weather",
+    "query": "2026-06-20去东京需要带伞吗",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "ticket_01",
+    "category": "ticket",
+    "query": "查询2026-06-20富山到东京的新干线票",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {
+        "departure_city": "富山",
+        "arrival_city": "东京",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "ticket_02",
+    "category": "ticket",
+    "query": "帮我看看2026-06-20东京到富山的火车票",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {
+        "departure_city": "东京",
+        "arrival_city": "富山",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "ticket_03",
+    "category": "ticket",
+    "query": "2026-06-20从富山出发去大阪有哪些列车",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {
+        "departure_city": "富山",
+        "arrival_city": "大阪",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "ticket_04",
+    "category": "ticket",
+    "query": "买一张2026-06-20富山去东京的票",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {
+        "departure_city": "富山",
+        "arrival_city": "东京",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "ticket_05",
+    "category": "ticket",
+    "query": "查2026-06-20大阪到东京的铁路班次",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {
+        "departure_city": "大阪",
+        "arrival_city": "东京",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "combined_01",
+    "category": "combined",
+    "query": "2026-06-20从富山去东京，查天气和新干线票",
+    "expected": {
+      "intent": "travel_planning",
+      "required_agents": ["weather_agent", "ticket_agent"],
+      "slots": {
+        "departure_city": "富山",
+        "arrival_city": "东京",
+        "city": "东京",
+        "fx_date": "2026-06-20",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "combined_02",
+    "category": "combined",
+    "query": "帮我查2026-06-20东京天气，再看看富山到东京的车票",
+    "expected": {
+      "intent": "travel_planning",
+      "required_agents": ["weather_agent", "ticket_agent"],
+      "slots": {
+        "departure_city": "富山",
+        "arrival_city": "东京",
+        "city": "东京",
+        "fx_date": "2026-06-20",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "combined_03",
+    "category": "combined",
+    "query": "2026-06-20东京会下雨吗？同一天从富山过去的新干线还有票吗",
+    "expected": {
+      "intent": "travel_planning",
+      "required_agents": ["weather_agent", "ticket_agent"],
+      "slots": {
+        "departure_city": "富山",
+        "arrival_city": "东京",
+        "city": "东京",
+        "fx_date": "2026-06-20",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "combined_04",
+    "category": "combined",
+    "query": "查2026-06-20大阪的气温以及东京到大阪的火车票",
+    "expected": {
+      "intent": "travel_planning",
+      "required_agents": ["weather_agent", "ticket_agent"],
+      "slots": {
+        "departure_city": "东京",
+        "arrival_city": "大阪",
+        "city": "大阪",
+        "fx_date": "2026-06-20",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "missing_01",
+    "category": "missing_slots",
+    "query": "帮我查东京天气",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京"},
+      "missing_slots": ["fx_date"],
+      "need_clarification": true
+    }
+  },
+  {
+    "id": "missing_02",
+    "category": "missing_slots",
+    "query": "帮我查2026-06-20的天气",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"fx_date": "2026-06-20"},
+      "missing_slots": ["city"],
+      "need_clarification": true
+    }
+  },
+  {
+    "id": "missing_03",
+    "category": "missing_slots",
+    "query": "帮我查天气",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {},
+      "missing_slots": ["city", "fx_date"],
+      "need_clarification": true
+    }
+  },
+  {
+    "id": "missing_04",
+    "category": "missing_slots",
+    "query": "查富山到东京的新干线票",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {"departure_city": "富山", "arrival_city": "东京"},
+      "missing_slots": ["travel_date"],
+      "need_clarification": true
+    }
+  },
+  {
+    "id": "missing_05",
+    "category": "missing_slots",
+    "query": "查2026-06-20去东京的票",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {"arrival_city": "东京", "travel_date": "2026-06-20"},
+      "missing_slots": ["departure_city"],
+      "need_clarification": true
+    }
+  },
+  {
+    "id": "missing_06",
+    "category": "missing_slots",
+    "query": "2026-06-20从富山出发的新干线",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {"departure_city": "富山", "travel_date": "2026-06-20"},
+      "missing_slots": ["arrival_city"],
+      "need_clarification": true
+    }
+  },
+  {
+    "id": "unsupported_01",
+    "category": "unsupported",
+    "query": "帮我查2026-06-20上海到北京的机票",
+    "expected": {
+      "intent": "unknown",
+      "required_agents": [],
+      "slots": {},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "unsupported_02",
+    "category": "unsupported",
+    "query": "推荐几个东京景点",
+    "expected": {
+      "intent": "unknown",
+      "required_agents": [],
+      "slots": {},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "unsupported_03",
+    "category": "unsupported",
+    "query": "帮我预订东京酒店",
+    "expected": {
+      "intent": "unknown",
+      "required_agents": [],
+      "slots": {},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "unsupported_04",
+    "category": "unsupported",
+    "query": "给我讲个笑话",
+    "expected": {
+      "intent": "unknown",
+      "required_agents": [],
+      "slots": {},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "edge_01",
+    "category": "routing_edge",
+    "query": "2026-06-20从富山去东京，只看天气，不用查票",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "edge_02",
+    "category": "routing_edge",
+    "query": "查2026-06-20东京天气和上海到东京的机票",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "edge_03",
+    "category": "routing_edge",
+    "query": "推荐东京景点，顺便查2026-06-20的天气",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "edge_04",
+    "category": "routing_edge",
+    "query": "我只想知道2026-06-20新干线沿线东京的天气",
+    "expected": {
+      "intent": "weather_query",
+      "required_agents": ["weather_agent"],
+      "slots": {"city": "东京", "fx_date": "2026-06-20"},
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  },
+  {
+    "id": "edge_05",
+    "category": "routing_edge",
+    "query": "不要查天气，只查2026-06-20富山到东京的新干线票",
+    "expected": {
+      "intent": "ticket_query",
+      "required_agents": ["ticket_agent"],
+      "slots": {
+        "departure_city": "富山",
+        "arrival_city": "东京",
+        "travel_date": "2026-06-20"
+      },
+      "missing_slots": [],
+      "need_clarification": false
+    }
+  }
+]

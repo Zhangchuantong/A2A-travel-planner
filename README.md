@@ -715,11 +715,35 @@ Qwen 会返回类似以下 JSON：
 - 使用本地 Qwen 完成理解与生成，数据查询结果仍来自 MySQL
 - Service、MCP、Agent、Router 各层都可独立测试
 
+## Router 自动评测
+
+项目提供带标准答案的 Router 测试集，覆盖天气、铁路票务、组合查询、
+缺失参数、未支持请求和易误路由表达。
+
+运行完整评测：
+
+```powershell
+python -X utf8 -m scripts.evaluate_router
+```
+
+评测会输出：
+
+- 意图识别准确率
+- Agent 路由完全匹配准确率
+- Agent Precision、Recall、F1
+- Agent 误调用率与未支持请求误调用率
+- 槽位值准确率与缺失槽位准确率
+- 追问判断准确率
+- 整体用例通过率
+- Mean、P50、P95 推理延迟
+
+详细指标定义和数据集说明见 `evaluation/README.md`。完整 JSON 报告默认保存在
+`.runtime/evaluation/`，当前三轮基准结果见 `evaluation/BASELINE.md`。
+
 ## 注意事项
 
-- `config/settings.py` 当前直接保存数据库密码，正式部署时建议改为环境变量。
 - 部分源文件中的中文文本存在编码显示异常时，请确认编辑器和终端统一使用 UTF-8。
-- Web 与 CLI 中提示了“景点”查询，但当前 Router 只实现了 Weather Agent 和 Ticket Agent 的实际调用。
+- 当前 Router 只实现 Weather Agent 和 Ticket Agent 的实际调用。
 
 ## License
 
