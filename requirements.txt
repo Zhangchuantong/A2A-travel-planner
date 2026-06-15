@@ -1,0 +1,6 @@
+mcp
+openai
+pydantic
+pymysql
+python-a2a
+streamlit
