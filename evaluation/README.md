@@ -26,14 +26,25 @@
 | Agent F1 | Agent Precision 与 Recall 的调和平均值 |
 | Agent False-positive Case Rate | 至少多调用一个 Agent 的用例比例，越低越好 |
 | Unsupported False-call Rate | 未支持请求中仍调用 Weather/Ticket Agent 的比例，越低越好 |
-| Slot Value Accuracy | 标准答案中所有槽位键值被正确提取的比例 |
-| Slot Case Accuracy | 一个用例的所有预期槽位均正确的用例比例 |
+| Slot Value Accuracy | 标准槽位键值被正确提取的比例，等价于 Slot Recall |
+| Slot Precision | 模型输出的槽位键值中正确项的比例，多输出错误槽位会降低该指标 |
+| Slot Recall | 标准答案中的槽位键值被正确提取的比例 |
+| Slot F1 | Slot Precision 与 Slot Recall 的调和平均值 |
+| Slot Case Accuracy | 一个用例的所有预期槽位均正确的比例，不惩罚额外槽位 |
+| Slot Exact-match Accuracy | 模型槽位字典与标准答案完全一致的用例比例 |
+| Extra-slot Case Rate | 至少多输出一个标准答案之外槽位的用例比例，越低越好 |
 | Missing-slot Accuracy | `missing_slots` 集合完全正确的比例 |
 | Clarification Accuracy | `need_clarification` 判断正确的比例 |
 | Overall Case Pass Rate | 解析、意图、路由、槽位、缺失槽位和追问判断全部正确的用例比例 |
 | Mean/P50/P95 Latency | Router 分析请求的平均、中位数和 95 分位延迟 |
 
-槽位评测只检查数据集中声明的标准槽位。模型额外提取了语义正确的上下文槽位时，不会被误判为错误。
+评测启动时会校验每条标准答案的完整性：每个 Agent 的必填槽位必须全部出现在
+`slots` 或 `missing_slots` 中，否则直接终止评测。严格指标会将标准答案之外的额外
+槽位视为误提取；`Slot Case Accuracy` 则保留为只观察预期槽位召回情况的宽松指标。
+
+`unsupported` 类按设计只评估不支持意图识别、Agent 路由和追问判断，不参与槽位
+Precision、Recall、F1 与完全匹配统计。即使模型提取了问题中的城市，也不会影响该类
+用例是否通过。
 
 ## 运行方法
 

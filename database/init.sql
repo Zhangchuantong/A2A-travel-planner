@@ -64,49 +64,7 @@ CREATE TABLE train_tickets (
 
 
 -- =========================================================
--- 3. 机票表
--- =========================================================
-DROP TABLE IF EXISTS flight_tickets;
-
-CREATE TABLE flight_tickets (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    departure_city VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    arrival_city VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    departure_time DATETIME NOT NULL,
-    arrival_time DATETIME NOT NULL,
-    flight_number VARCHAR(20) NOT NULL,
-    cabin_type VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    total_seats INT NOT NULL,
-    remaining_seats INT NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_flight (departure_time, flight_number)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- =========================================================
--- 4. 演唱会票表
--- =========================================================
-DROP TABLE IF EXISTS concert_tickets;
-
-CREATE TABLE concert_tickets (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    artist VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    city VARCHAR(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    venue VARCHAR(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    start_time DATETIME NOT NULL,
-    end_time DATETIME NOT NULL,
-    ticket_type VARCHAR(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    total_seats INT NOT NULL,
-    remaining_seats INT NOT NULL,
-    price DECIMAL(10, 2) NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY unique_concert (start_time, artist, ticket_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-
--- =========================================================
--- 5. 插入天气测试数据
+-- 3. 插入天气测试数据
 -- =========================================================
 INSERT INTO weather_data
 (city, fx_date, sunrise, sunset, moonrise, moonset, moon_phase, moon_phase_icon,
@@ -141,7 +99,7 @@ VALUES
 
 
 -- =========================================================
--- 6. 插入火车票测试数据
+-- 4. 插入火车票测试数据
 -- =========================================================
 INSERT INTO train_tickets
 (departure_city, arrival_city, departure_time, arrival_time, train_number,
@@ -164,49 +122,7 @@ VALUES
 
 
 -- =========================================================
--- 7. 插入机票测试数据
--- =========================================================
-INSERT INTO flight_tickets
-(departure_city, arrival_city, departure_time, arrival_time, flight_number,
- cabin_type, total_seats, remaining_seats, price)
-VALUES
-('东京', '大阪', '2026-06-20 08:30:00', '2026-06-20 09:45:00',
- 'JL101', '经济舱', 180, 35, 15000.00),
-
-('东京', '大阪', '2026-06-20 12:10:00', '2026-06-20 13:25:00',
- 'NH023', '经济舱', 180, 48, 14200.00),
-
-('东京', '札幌', '2026-06-20 09:00:00', '2026-06-20 10:35:00',
- 'JL503', '经济舱', 200, 27, 18500.00),
-
-('大阪', '东京', '2026-06-20 17:30:00', '2026-06-20 18:45:00',
- 'NH036', '经济舱', 180, 52, 14800.00);
-
-
--- =========================================================
--- 8. 插入演唱会票测试数据
--- =========================================================
-INSERT INTO concert_tickets
-(artist, city, venue, start_time, end_time, ticket_type,
- total_seats, remaining_seats, price)
-VALUES
-('周杰伦', '东京', 'Tokyo Dome', '2026-06-20 19:00:00', '2026-06-20 21:30:00',
- 'A席', 5000, 320, 18000.00),
-
-('周杰伦', '东京', 'Tokyo Dome', '2026-06-20 19:00:00', '2026-06-20 21:30:00',
- 'S席', 3000, 120, 25000.00),
-
-('YOASOBI', '大阪', 'Osaka Jo Hall', '2026-06-21 18:30:00', '2026-06-21 21:00:00',
- '普通席', 4000, 450, 12000.00),
-
-('Ado', '东京', 'Ariake Arena', '2026-06-22 19:00:00', '2026-06-22 21:00:00',
- '普通席', 6000, 700, 11000.00);
-
-
--- =========================================================
--- 9. 检查数据
+-- 5. 检查数据
 -- =========================================================
 SELECT 'weather_data' AS table_name, COUNT(*) AS row_count FROM weather_data;
 SELECT 'train_tickets' AS table_name, COUNT(*) AS row_count FROM train_tickets;
-SELECT 'flight_tickets' AS table_name, COUNT(*) AS row_count FROM flight_tickets;
-SELECT 'concert_tickets' AS table_name, COUNT(*) AS row_count FROM concert_tickets;

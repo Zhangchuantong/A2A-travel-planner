@@ -15,6 +15,20 @@ from router_agent.analyzer import analyze_query
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DATASET = PROJECT_ROOT / "evaluation" / "router_cases.json"
 DEFAULT_OUTPUT_DIR = PROJECT_ROOT / ".runtime" / "evaluation"
+AGENT_SLOTS = {
+    "weather_agent": {"city", "fx_date"},
+    "ticket_agent": {
+        "departure_city",
+        "arrival_city",
+        "travel_date",
+    },
+}
+ALLOWED_INTENTS = {
+    "weather_query",
+    "ticket_query",
+    "travel_planning",
+    "unknown",
+}
 
 
 def parse_args() -> argparse.Namespace:
@@ -52,7 +66,120 @@ def load_cases(path: Path, limit: int | None) -> list[dict[str, Any]]:
     cases = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(cases, list):
         raise ValueError("Evaluation dataset must be a JSON list.")
+    validate_cases(cases)
     return cases[:limit] if limit else cases
+
+
+def validate_cases(cases: list[dict[str, Any]]) -> None:
+    seen_ids = set()
+    for case in cases:
+        case_id = case.get("id")
+        if not case_id or case_id in seen_ids:
+            raise ValueError(f"Invalid or duplicate case id: {case_id!r}")
+        seen_ids.add(case_id)
+
+        expected = case.get("expected")
+        if not isinstance(expected, dict):
+            raise ValueError(f"{case_id}: expected must be an object.")
+
+        intent = expected.get("intent")
+        agents = expected.get("required_agents")
+        slots = expected.get("slots")
+        missing_slots = expected.get("missing_slots")
+        need_clarification = expected.get("need_clarification")
+
+        if intent not in ALLOWED_INTENTS:
+            raise ValueError(f"{case_id}: invalid intent {intent!r}.")
+        if not isinstance(agents, list) or not set(agents) <= set(AGENT_SLOTS):
+            raise ValueError(f"{case_id}: invalid required_agents.")
+        if not isinstance(slots, dict):
+            raise ValueError(f"{case_id}: slots must be an object.")
+        if not isinstance(missing_slots, list):
+            raise ValueError(f"{case_id}: missing_slots must be a list.")
+        if need_clarification is not bool(missing_slots):
+            raise ValueError(
+                f"{case_id}: need_clarification must match missing_slots."
+            )
+
+        required_slot_names = set().union(
+            *(AGENT_SLOTS[agent] for agent in agents),
+        ) if agents else set()
+        labeled_slot_names = set(slots) | set(missing_slots)
+        if labeled_slot_names != required_slot_names:
+            raise ValueError(
+                f"{case_id}: incomplete slot labels; expected "
+                f"{sorted(required_slot_names)}, got "
+                f"{sorted(labeled_slot_names)}."
+            )
+
+
+def score_prediction(
+    case: dict[str, Any],
+    prediction: dict[str, Any],
+    error: str | None = None,
+) -> tuple[dict[str, bool], dict[str, bool], dict[str, int]]:
+    expected = case["expected"]
+    expected_agents = set(expected["required_agents"])
+    predicted_agents = set(prediction.get("required_agents", []))
+    expected_slots = expected.get("slots", {})
+    predicted_slots = prediction.get("slots", {})
+    if not isinstance(predicted_slots, dict):
+        predicted_slots = {}
+    slots_evaluated = bool(expected_agents)
+
+    if slots_evaluated:
+        slot_checks = {
+            key: predicted_slots.get(key) == value
+            for key, value in expected_slots.items()
+        }
+        expected_slot_items = set(expected_slots.items())
+        predicted_slot_items = set(predicted_slots.items())
+        slot_tp = len(expected_slot_items & predicted_slot_items)
+        slot_fp = len(predicted_slot_items - expected_slot_items)
+        slot_fn = len(expected_slot_items - predicted_slot_items)
+        slots_correct = all(slot_checks.values())
+        slots_exact = predicted_slots == expected_slots
+    else:
+        slot_checks = {}
+        slot_tp = 0
+        slot_fp = 0
+        slot_fn = 0
+        slots_correct = True
+        slots_exact = True
+
+    checks = {
+        "parse_success": error is None,
+        "intent_correct": prediction.get("intent") == expected["intent"],
+        "route_exact": predicted_agents == expected_agents,
+        "slots_evaluated": slots_evaluated,
+        "slots_correct": slots_correct,
+        "slots_exact": slots_exact,
+        "missing_slots_correct": (
+            set(prediction.get("missing_slots", []))
+            == set(expected.get("missing_slots", []))
+        ),
+        "clarification_correct": (
+            prediction.get("need_clarification")
+            == expected.get("need_clarification")
+        ),
+    }
+    checks["case_pass"] = all(
+        checks[name]
+        for name in (
+            "parse_success",
+            "intent_correct",
+            "route_exact",
+            "slots_exact",
+            "missing_slots_correct",
+            "clarification_correct",
+        )
+    )
+    slot_counts = {
+        "tp": slot_tp,
+        "fp": slot_fp,
+        "fn": slot_fn,
+    }
+    return checks, slot_checks, slot_counts
 
 
 def percentile(values: list[float], percentile_value: float) -> float:
@@ -83,30 +210,11 @@ def evaluate_case(case: dict[str, Any]) -> dict[str, Any]:
     latency_seconds = time.perf_counter() - start
 
     expected = case["expected"]
-    expected_agents = set(expected["required_agents"])
-    predicted_agents = set(prediction.get("required_agents", []))
-    expected_slots = expected.get("slots", {})
-    predicted_slots = prediction.get("slots", {})
-
-    slot_checks = {
-        key: predicted_slots.get(key) == value
-        for key, value in expected_slots.items()
-    }
-    checks = {
-        "parse_success": error is None,
-        "intent_correct": prediction.get("intent") == expected["intent"],
-        "route_exact": predicted_agents == expected_agents,
-        "slots_correct": all(slot_checks.values()),
-        "missing_slots_correct": (
-            set(prediction.get("missing_slots", []))
-            == set(expected.get("missing_slots", []))
-        ),
-        "clarification_correct": (
-            prediction.get("need_clarification")
-            == expected.get("need_clarification")
-        ),
-    }
-    checks["case_pass"] = all(checks.values())
+    checks, slot_checks, slot_counts = score_prediction(
+        case,
+        prediction,
+        error,
+    )
 
     return {
         "id": case["id"],
@@ -116,6 +224,7 @@ def evaluate_case(case: dict[str, Any]) -> dict[str, Any]:
         "prediction": prediction,
         "checks": checks,
         "slot_checks": slot_checks,
+        "slot_counts": slot_counts,
         "latency_seconds": round(latency_seconds, 4),
         "error": error,
     }
@@ -128,6 +237,7 @@ def aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
         "intent_correct",
         "route_exact",
         "slots_correct",
+        "slots_exact",
         "missing_slots_correct",
         "clarification_correct",
         "case_pass",
@@ -146,8 +256,10 @@ def aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
     false_positive_cases = 0
     unsupported_cases = 0
     unsupported_false_calls = 0
-    slot_total = 0
-    slot_correct = 0
+    slot_tp = 0
+    slot_fp = 0
+    slot_fn = 0
+    extra_slot_cases = 0
 
     for result in results:
         expected_agents = set(result["expected"]["required_agents"])
@@ -161,12 +273,20 @@ def aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
             unsupported_cases += 1
             unsupported_false_calls += bool(predicted_agents)
 
-        slot_total += len(result["slot_checks"])
-        slot_correct += sum(result["slot_checks"].values())
+        slot_tp += result["slot_counts"]["tp"]
+        slot_fp += result["slot_counts"]["fp"]
+        slot_fn += result["slot_counts"]["fn"]
+        extra_slot_cases += result["slot_counts"]["fp"] > 0
 
     precision = safe_divide(agent_tp, agent_tp + agent_fp)
     recall = safe_divide(agent_tp, agent_tp + agent_fn)
     f1 = safe_divide(2 * precision * recall, precision + recall)
+    slot_precision = safe_divide(slot_tp, slot_tp + slot_fp)
+    slot_recall = safe_divide(slot_tp, slot_tp + slot_fn)
+    slot_f1 = safe_divide(
+        2 * slot_precision * slot_recall,
+        slot_precision + slot_recall,
+    )
     latencies = [result["latency_seconds"] for result in results]
 
     by_category = {}
@@ -188,6 +308,10 @@ def aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
             ),
         }
 
+    slot_evaluated_cases = sum(
+        result["checks"]["slots_evaluated"] for result in results
+    )
+
     return {
         "cases": total,
         "parse_success_rate": summary["parse_success"],
@@ -204,8 +328,30 @@ def aggregate(results: list[dict[str, Any]]) -> dict[str, Any]:
             unsupported_false_calls,
             unsupported_cases,
         ),
-        "slot_value_accuracy": safe_divide(slot_correct, slot_total),
-        "slot_case_accuracy": summary["slots_correct"],
+        "slot_value_accuracy": slot_recall,
+        "slot_precision": slot_precision,
+        "slot_recall": slot_recall,
+        "slot_f1": slot_f1,
+        "slot_case_accuracy": safe_divide(
+            sum(
+                result["checks"]["slots_correct"]
+                for result in results
+                if result["checks"]["slots_evaluated"]
+            ),
+            slot_evaluated_cases,
+        ),
+        "slot_exact_match_accuracy": safe_divide(
+            sum(
+                result["checks"]["slots_exact"]
+                for result in results
+                if result["checks"]["slots_evaluated"]
+            ),
+            slot_evaluated_cases,
+        ),
+        "extra_slot_case_rate": safe_divide(
+            extra_slot_cases,
+            slot_evaluated_cases,
+        ),
         "missing_slots_accuracy": summary["missing_slots_correct"],
         "clarification_accuracy": summary["clarification_correct"],
         "overall_case_pass_rate": summary["case_pass"],
@@ -241,7 +387,18 @@ def print_summary(summary: dict[str, Any]) -> None:
         f"{format_rate(summary['unsupported_false_call_rate'])}"
     )
     print(f"Slot value accuracy: {format_rate(summary['slot_value_accuracy'])}")
+    print(f"Slot precision: {format_rate(summary['slot_precision'])}")
+    print(f"Slot recall: {format_rate(summary['slot_recall'])}")
+    print(f"Slot F1: {format_rate(summary['slot_f1'])}")
     print(f"Slot case accuracy: {format_rate(summary['slot_case_accuracy'])}")
+    print(
+        "Slot exact-match accuracy: "
+        f"{format_rate(summary['slot_exact_match_accuracy'])}"
+    )
+    print(
+        "Extra-slot case rate: "
+        f"{format_rate(summary['extra_slot_case_rate'])}"
+    )
     print(
         "Missing-slot accuracy: "
         f"{format_rate(summary['missing_slots_accuracy'])}"
