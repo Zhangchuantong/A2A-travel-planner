@@ -6,7 +6,7 @@ from router_agent.analyzer import analyze_query
 
 
 def main():
-    query = "我想2026-06-20从富山去东京，帮我看看天气和新干线票。"
+    query = "我想2025-08-02从北京去上海，帮我看看天气和火车票。"
 
     result = analyze_query(query)
 
