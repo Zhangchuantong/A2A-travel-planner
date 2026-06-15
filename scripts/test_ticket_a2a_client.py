@@ -23,9 +23,9 @@ async def main():
     task = Task()
     task.metadata = {
         "slots": {
-            "departure_city": "富山",
-            "arrival_city": "东京",
-            "travel_date": "2026-06-20",
+            "departure_city": "北京",
+            "arrival_city": "上海",
+            "travel_date": "2025-08-02",
         }
     }
 

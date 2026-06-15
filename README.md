@@ -302,14 +302,7 @@ A2A-travel-planner/
 | `scripts/import_csv_data.py` | 将天气和火车票 CSV 数据批量写入 MySQL，并通过唯一键执行更新或插入。 |
 | `scripts/start_all.ps1` | 完整启动编排脚本；检查 Docker Desktop、等待容器就绪、管理虚拟环境并启动三个本地服务。 |
 | `scripts/stop_all.ps1` | 根据 `.runtime` 中保存的 PID 停止本地服务，并可选择停止 Docker 容器。 |
-| `scripts/test_mysql_connection.py` | 通过天气和票务 Service 验证 MySQL 连接与测试数据。 |
 | `scripts/test_services.py` | 直接测试天气与票务 Service 层。 |
-| `scripts/test_weather_mcp_logic.py` | 不经过 MCP 通信，直接测试天气 MCP 工具逻辑及未查询到数据的分支。 |
-| `scripts/test_ticket_mcp_logic.py` | 不经过 MCP 通信，直接测试票务 MCP 工具逻辑及未查询到数据的分支。 |
-| `scripts/test_weather_mcp_client.py` | 测试 Weather MCP Client 到 MCP Server 的完整 stdio 调用。 |
-| `scripts/test_ticket_mcp_client.py` | 测试 Ticket MCP Client 到 MCP Server 的完整 stdio 调用。 |
-| `scripts/test_weather_agent_handler.py` | 构造 A2A Task，直接测试 Weather Agent Handler。 |
-| `scripts/test_ticket_agent_handler.py` | 构造 A2A Task，直接测试 Ticket Agent Handler。 |
 | `scripts/test_weather_a2a_client.py` | 获取 Weather Agent Card，并向 9001 端口发送真实 A2A Task。 |
 | `scripts/test_ticket_a2a_client.py` | 获取 Ticket Agent Card，并向 9002 端口发送真实 A2A Task。 |
 | `scripts/test_router_analyzer.py` | 单独测试 Qwen 的意图识别和槽位抽取结果。 |
@@ -591,27 +584,6 @@ Router 会依次完成：
 
 ```powershell
 python scripts/test_services.py
-```
-
-### MCP 工具逻辑
-
-```powershell
-python scripts/test_weather_mcp_logic.py
-python scripts/test_ticket_mcp_logic.py
-```
-
-### MCP stdio 调用
-
-```powershell
-python scripts/test_weather_mcp_client.py
-python scripts/test_ticket_mcp_client.py
-```
-
-### Agent Handler
-
-```powershell
-python scripts/test_weather_agent_handler.py
-python scripts/test_ticket_agent_handler.py
 ```
 
 ### A2A 通信
