@@ -4,7 +4,8 @@
 
 当前自动评测聚焦 Router Agent，测试从用户自然语言到结构化分析结果的质量，不访问 MySQL，也不调用 Weather/Ticket Agent。
 
-数据集 `router_cases.json` 覆盖：
+数据集 `router_cases.json` 的天气城市、日期、铁路线路及出行日期均来自
+项目 MySQL 数据库中的真实记录，覆盖：
 
 - 天气查询
 - 铁路票务查询
