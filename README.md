@@ -25,6 +25,11 @@
 - MySQL 天气与票务数据查询
 - Agent Artifact 标准化结果封装
 - 大语言模型结果聚合与旅行建议生成
+- 跨 Router、LLM、A2A Client 与 Agent Server 的 trace_id 追踪与结构化 JSON 日志
+- LLM 与 A2A 调用的超时、重试与失败退避
+- 单个 Agent 失败时的优雅降级（部分成功）
+- MySQL 连接池复用，降低建连开销
+- Router 意图识别离线评测框架（准确率与延迟指标）
 
 ## 技术栈
 
@@ -37,9 +42,13 @@
 | 大语言模型 | Qwen3-8B-AWQ | 意图识别、槽位抽取和最终答案生成 |
 | 模型服务 | vLLM | 提供 OpenAI API 兼容的本地模型接口 |
 | 模型客户端 | OpenAI Python SDK | 调用 vLLM 的 Chat Completions API |
+| 实时数据 | Open-Meteo API | 免费免 key 的实时天气预报，覆盖未来预报窗口，数据库作为兜底 |
 | 数据库 | MySQL | 存储天气和火车票数据 |
 | 数据库驱动 | PyMySQL | Python 访问 MySQL |
+| 连接池 | DBUtils（PooledDB） | 复用 MySQL 连接，避免每次查询重新建连 |
 | 并发模型 | `asyncio` | 并发调用多个 A2A Agent |
+| 线程并发 | `concurrent.futures` | 评测时用线程池并发跑用例，利用 vLLM 批处理 |
+| 日志与追踪 | `logging`（JSON 格式）+ trace_id | 结构化日志，跨层串联同一次请求 |
 | 数据格式 | JSON | LLM 分析结果、MCP 返回值和 Artifact 数据格式 |
 
 ## 系统架构
@@ -165,6 +174,18 @@ A2A 负责“Agent 找 Agent”
 MCP 负责“Agent 调工具”
 ```
 
+## 可观测性与容错
+
+为了让系统更接近可运维的状态，项目在基础流程之上增加了以下能力：
+
+- **结构化日志**：`common/logger.py` 统一输出 JSON 格式日志，便于检索和分析。
+- **trace_id 追踪**：每次请求在 Router 入口生成 `trace_id`，贯穿意图分析、LLM 调用、A2A 调用以及 Agent Server 处理，可在日志中串联同一次请求。当前覆盖 Router / LLM / A2A Client / Agent Server，尚未透传到 MCP 子进程内部。
+- **超时与重试**：LLM、A2A 与 MCP 调用都设置了超时时间，LLM 和 A2A 还带失败重试（退避），避免单点卡死拖垮整条链路。
+- **优雅降级**：使用 `asyncio.gather(return_exceptions=True)` 并发调用 Agent，单个 Agent 失败时仍返回其他 Agent 的结果，整体状态标记为 `partial_success`；全部失败则返回 `agent_failed` 且不再调用最终回答 LLM。
+- **阶段计时**：`common/timer.py` 记录意图分析、A2A 调用和最终答案生成各阶段耗时。
+
+> 说明：连接池、超时重试、结构化日志等属于工程化加固。仍可进一步完善的方向包括：trace_id 透传到 MCP 子进程、A2A Server 鉴权与限流、自动化测试与 CI、以及将 MCP 由每次 stdio 启动改为常驻服务。
+
 ## 数据流
 
 ### Weather Agent
@@ -205,13 +226,14 @@ A2A-travel-planner/
 ├── a2a_agents/              # 天气和票务 A2A Agent
 │   ├── weather_agent/
 │   └── ticket_agent/
-├── common/                  # 数据库、LLM、JSON、Artifact 公共模块
-├── config/                  # MySQL 与 vLLM 配置
+├── common/                  # 数据库连接池、LLM、JSON、Artifact、日志、计时公共模块
+├── config/                  # MySQL、vLLM 与超时/重试配置
 ├── database/                # 数据库建表及测试数据
+├── evaluation/              # Router 意图识别评测用例与结果
 ├── mcp_clients/             # MCP stdio 客户端
 ├── mcp_servers/             # FastMCP 工具服务
 ├── router_agent/            # 意图分析、Agent 路由与结果聚合
-├── scripts/                 # 启停脚本、CSV 导入、CLI 和分层测试
+├── scripts/                 # 启停脚本、CSV 导入、CLI、分层测试与评测
 ├── services/                # MySQL 数据查询服务
 ├── requirements.txt         # 项目完整 Python 依赖
 └── README.md
@@ -232,16 +254,18 @@ A2A-travel-planner/
 | 文件 | 作用 |
 | --- | --- |
 | `config/__init__.py` | 将 `config` 标记为 Python 包。 |
-| `config/settings.py` | 配置 MySQL 地址、端口、用户名、密码、数据库名，以及 vLLM 地址、API Key 和 Qwen 模型名。 |
+| `config/settings.py` | 配置 MySQL 与 vLLM 连接信息，以及 LLM 和 A2A 的超时秒数与重试次数（`LLM_TIMEOUT_SECONDS`、`A2A_TIMEOUT_SECONDS` 等）。 |
 
 ### `common/`
 
 | 文件 | 作用 |
 | --- | --- |
-| `common/db.py` | 创建 PyMySQL 连接，提供查询单条记录的 `query_one()` 和查询多条记录的 `query_all()`。 |
-| `common/llm_client.py` | 创建 OpenAI SDK 客户端，通过 OpenAI 兼容接口调用本地 vLLM/Qwen 模型。 |
+| `common/db.py` | 基于 DBUtils 的 MySQL 连接池，提供 `query_one()` 和 `query_all()`；连接用完归还池中复用，懒加载不在 import 时强连数据库。 |
+| `common/llm_client.py` | 创建 OpenAI SDK 客户端调用本地 vLLM/Qwen；内置超时、重试、思考内容剥离，并按 trace_id 记录调用日志。 |
 | `common/json_utils.py` | 从 LLM 输出中提取 JSON，兼容纯 JSON、Markdown 代码块以及夹杂说明文字的响应。 |
 | `common/artifact_utils.py` | 统一创建包含类型、Agent、状态、数据、摘要和时间戳的 A2A Artifact。 |
+| `common/logger.py` | 配置全局结构化 JSON 日志，提供 `get_logger()`、`log_event()` 和 `new_trace_id()`。 |
+| `common/timer.py` | 上下文管理器 `timer()`，统计各阶段耗时并按 trace_id 写入结构化日志。 |
 
 ### `services/`
 
@@ -290,8 +314,8 @@ A2A-travel-planner/
 | 文件 | 作用 |
 | --- | --- |
 | `router_agent/__init__.py` | 将 `router_agent` 标记为 Python 包。 |
-| `router_agent/analyzer.py` | 构造意图识别 Prompt，调用 Qwen，将自然语言请求转换为结构化路由 JSON。 |
-| `router_agent/router.py` | 核心编排模块；创建 A2A Client、并发调用专业 Agent、合并 Artifact，并调用聚合器。 |
+| `router_agent/analyzer.py` | 构造意图识别 Prompt，调用 Qwen，并用关键词与否定表达规则纠偏，输出结构化路由 JSON。 |
+| `router_agent/router.py` | 核心编排模块；生成 trace_id、带超时与重试地并发调用专业 Agent、合并 Artifact、对单 Agent 失败做降级，并调用聚合器。 |
 | `router_agent/aggregator.py` | 将用户问题、意图分析和多个 Artifact 交给 Qwen，生成最终自然语言答案。 |
 
 ### `scripts/` 业务测试
@@ -307,6 +331,8 @@ A2A-travel-planner/
 | `scripts/test_ticket_a2a_client.py` | 获取 Ticket Agent Card，并向 9002 端口发送真实 A2A Task。 |
 | `scripts/test_router_analyzer.py` | 单独测试 Qwen 的意图识别和槽位抽取结果。 |
 | `scripts/test_router_llm.py` | 完整端到端入口，执行意图分析、A2A 路由、MCP 查询和最终答案生成。 |
+| `scripts/generate_router_eval_cases.py` | 基于数据库数据生成 Router 意图识别评测用例。 |
+| `scripts/evaluate_router.py` | 用线程池并发跑评测用例，统计意图、路由、槽位准确率与延迟，结果写入 `evaluation/`。 |
 
 ## 数据库设计
 
@@ -403,6 +429,30 @@ $env:VLLM_MODEL = "Qwen/Qwen3-8B-AWQ"
 ```
 
 vLLM 必须在运行 Router 之前启动，并暴露 OpenAI 兼容接口。
+
+### 超时、重试与连接池
+
+以下配置均有默认值，可按需通过环境变量覆盖：
+
+```powershell
+# LLM、A2A 与 MCP 的超时秒数和重试次数
+$env:LLM_TIMEOUT_SECONDS = "60"
+$env:LLM_RETRY_TIMES = "1"
+$env:A2A_TIMEOUT_SECONDS = "30"
+$env:A2A_RETRY_TIMES = "1"
+$env:MCP_TIMEOUT_SECONDS = "20"
+
+# MySQL 连接池
+$env:MYSQL_POOL_MAX = "10"        # 池中最大连接数
+$env:MYSQL_POOL_MIN = "0"         # 启动预建连接数（0 = 懒加载，import 时不连库）
+$env:MYSQL_POOL_MAX_IDLE = "5"    # 空闲时最多保留的连接数
+
+# 实时天气 API（Open-Meteo，免费免 key）
+$env:WEATHER_API_ENABLED = "1"          # 设为 0 则仅使用本地数据库
+$env:WEATHER_API_TIMEOUT_SECONDS = "8"
+```
+
+> 天气查询优先使用实时 API（覆盖今天起约 16 天内的预报），超出窗口、查无城市或网络异常时自动回退到本地 `weather_data` 表。
 
 示例：
 
@@ -614,6 +664,41 @@ python scripts/chat_cli.py
 streamlit run app.py
 ```
 
+### Router 意图识别评测
+
+对 `evaluation/router_eval_cases.json` 中的用例批量运行意图识别，统计准确率与延迟：
+
+```powershell
+python scripts/evaluate_router.py
+```
+
+评测使用线程池并发执行（默认 4 线程），可通过环境变量调整并发度：
+
+```powershell
+$env:ROUTER_EVAL_WORKERS = "4"
+python scripts/evaluate_router.py
+```
+
+由于本地 vLLM 支持连续批处理（continuous batching），并发请求会被合并到 GPU 一起处理，
+因此并发执行能显著缩短评测总耗时；加速比受 GPU 显存与算力上限约束，不会随线程数线性增长。
+评测结果写入 `evaluation/router_eval_results.json`，汇总里的 `total_wall_seconds` 反映真实总耗时。
+
+### 评测驱动的优化结果
+
+以 100 条用例为基准，通过评测定位失败模式后，开启模型思考模式并在 `analyzer` 中加入关键词与否定表达纠偏规则，路由质量显著提升：
+
+| 指标 | Baseline（无思考） | 优化后 | 变化 |
+| --- | --- | --- | --- |
+| 失败用例数 | 27 / 100 | 1 / 100 | ↓ 96% |
+| 意图识别准确率 | 90% | 99% | +9 |
+| Agent 路由准确率 | 90% | 99% | +9 |
+| 槽位精确匹配 | 82% | 99% | +17 |
+| 缺失槽位判断准确率 | 75% | 100% | +25 |
+| 追问判断准确率 | 79% | 100% | +21 |
+| 平均单用例延迟 | 1.4s | 5～7s | ↑（思考模式带来的代价） |
+
+优化手段：开启思考模式、关键词/否定表达纠偏、补全火车票关键词、确定性槽位推导（缺 `city` 用 `arrival_city`、缺 `fx_date` 用 `travel_date`）。思考模式以延迟换取准确率，路由失败率从 27% 降至 1%；唯一残留失败是不含任何领域关键词的模糊请求，属语义上本就两可的边界情形。
+
 ## Router 分析结果格式
 
 Qwen 会返回类似以下 JSON：
@@ -655,11 +740,21 @@ Qwen 会返回类似以下 JSON：
 }
 ```
 
-`status` 可能为：
+单个 Artifact 的 `status` 可能为：
 
 - `success`：查询成功
 - `not_found`：未查询到符合条件的数据
 - `failed`：参数缺失或任务处理失败
+
+Router 聚合后返回的整体 `status` 可能为：
+
+- `success`：全部 Agent 成功
+- `partial_success`：部分 Agent 失败，但仍有可用结果（优雅降级）
+- `agent_failed`：所有被调用的 Agent 都失败
+- `need_clarification`：参数缺失，需要追问
+- `no_supported_agent`：没有匹配到支持的 Agent
+
+整体响应中还包含 `trace_id`，可用于在结构化日志里串联同一次请求。
 
 ## 端口说明
 
@@ -684,6 +779,11 @@ Qwen 会返回类似以下 JSON：
 - 支持参数缺失后的多轮追问和上下文合并
 - 使用本地 Qwen 完成理解与生成，数据查询结果仍来自 MySQL
 - Service、MCP、Agent、Router 各层都可独立测试
+- 通过 trace_id 与结构化 JSON 日志实现请求级可观测性
+- LLM 与 A2A 调用具备超时、重试与失败退避
+- 单 Agent 失败时优雅降级，返回部分可用结果
+- MySQL 连接池复用连接，降低高并发下的建连开销
+- 提供 Router 意图识别离线评测框架，量化准确率与延迟
 
 ## 注意事项
 

@@ -1,6 +1,9 @@
-mcp
-openai
-pydantic
-pymysql
-python-a2a
-streamlit
+# 锁定版本以保证复现性（基于当前验证通过的环境）
+httpx==0.28.1
+mcp==1.27.2
+openai==2.41.1
+pydantic==2.13.4
+PyMySQL==1.2.0
+python-a2a==0.5.10
+streamlit==1.58.0
+DBUtils==3.1.2
