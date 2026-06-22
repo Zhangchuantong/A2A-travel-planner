@@ -28,9 +28,50 @@ TRAIN_KEYWORDS = (
     "动车",
     "铁路",
     "班次",
+    "车次",
 )
 FLIGHT_KEYWORDS = ("机票", "航班", "飞机")
 ATTRACTION_KEYWORDS = ("景点", "门票", "攻略", "旅游路线", "推荐路线")
+NEGATIVE_WEATHER_PATTERNS = (
+    "不要查天气",
+    "不用查天气",
+    "别查天气",
+    "先别查天气",
+    "不查天气",
+    "不要看天气",
+    "不用看天气",
+    "别看天气",
+    "先别看天气",
+    "不要天气预报",
+    "不用天气预报",
+    "不要天气",
+    "不用天气",
+    "天气我已经知道",
+    "我不是问天气",
+    "不是问天气",
+)
+NEGATIVE_TICKET_PATTERNS = (
+    "不要查票",
+    "不用查票",
+    "别查票",
+    "先别查票",
+    "不查票",
+    "不要查车票",
+    "不用查车票",
+    "不要看车票",
+    "不用看车票",
+    "别看车票",
+    "先别查车票",
+    "先不查火车票",
+    "不查火车票",
+    "不用火车票",
+    "不要火车票",
+    "票的事情先放一边",
+    "票先放一边",
+    "车票我晚点自己看",
+    "车票暂时不用",
+    "火车票暂时不用",
+)
 INVALID_SLOT_VALUES = {
     "",
     "未知",
@@ -74,10 +115,17 @@ def _normalize_analysis(user_query: str, analysis: dict[str, Any]) -> dict[str, 
     wants_train = _contains_any(user_query, TRAIN_KEYWORDS)
     wants_flight = _contains_any(user_query, FLIGHT_KEYWORDS)
     wants_attraction = _contains_any(user_query, ATTRACTION_KEYWORDS)
+    excludes_weather = _contains_any(user_query, NEGATIVE_WEATHER_PATTERNS)
+    excludes_ticket = _contains_any(user_query, NEGATIVE_TICKET_PATTERNS)
 
     # “票”可表示火车票，但机票和景点门票不能路由到 ticket_agent。
     if "票" in user_query and not wants_flight and "门票" not in user_query:
         wants_train = True
+
+    if excludes_weather:
+        wants_weather = False
+    if excludes_ticket:
+        wants_train = False
 
     has_explicit_domain = any(
         (wants_weather, wants_train, wants_flight, wants_attraction)
@@ -94,6 +142,15 @@ def _normalize_analysis(user_query: str, analysis: dict[str, Any]) -> dict[str, 
             agent for agent in raw_agents if agent in SUPPORTED_AGENTS
         ]
 
+    if excludes_weather:
+        required_agents = [
+            agent for agent in required_agents if agent != "weather_agent"
+        ]
+    if excludes_ticket:
+        required_agents = [
+            agent for agent in required_agents if agent != "ticket_agent"
+        ]
+
     normalized["required_agents"] = required_agents
 
     if required_agents == ["weather_agent"]:
@@ -104,6 +161,15 @@ def _normalize_analysis(user_query: str, analysis: dict[str, Any]) -> dict[str, 
         normalized["intent"] = "travel_planning"
     else:
         normalized["intent"] = "unknown"
+
+    # 确定性槽位推导：组合查询里天气槽位常可由票务槽位推出，
+    # 不完全依赖 LLM 自己填，减少漏填导致的误判。
+    if "weather_agent" in required_agents:
+        slots = normalized["slots"]
+        if not _is_valid_slot(slots.get("city")) and _is_valid_slot(slots.get("arrival_city")):
+            slots["city"] = slots["arrival_city"]
+        if not _is_valid_slot(slots.get("fx_date")) and _is_valid_slot(slots.get("travel_date")):
+            slots["fx_date"] = slots["travel_date"]
 
     missing_slots = []
     for agent in required_agents:
@@ -148,8 +214,19 @@ def build_analyze_prompt(user_query: str) -> str:
 - 如果用户说“天气”，通常查询目的地城市的天气
 - 只有用户明确查询“票”、“车票”、“新干线”、“火车票”、“列车”等铁路票务时，才调用 ticket_agent
 - 用户提供出发地和目的地，不代表用户一定要查询火车票
+- train_tickets 数据表只存储火车/高铁/新干线票，不存储飞机票
 - “机票”、“航班”、“飞机”不属于 ticket_agent，不能调用 ticket_agent
+- 如果用户说“不是机票/不是航班，而是火车票/高铁/新干线/列车”，这是铁路票务查询，应调用 ticket_agent
 - 景点推荐当前不支持，不要返回不存在的 Agent
+
+否定表达处理规则：
+- 如果用户说“不要查天气”、“不用看天气”、“别看天气”、“先别查天气”、“不要天气预报”，不要调用 weather_agent。
+- 如果用户说“不要查票”、“不用看车票”、“先别查票”、“先不查火车票”，不要调用 ticket_agent。
+- 如果用户说“天气我已经知道了”、“我不是问天气”，不要调用 weather_agent。
+- 如果用户说“票的事情先放一边”、“车票我晚点自己看”、“火车票暂时不用”，不要调用 ticket_agent。
+- 如果一句话同时包含否定表达和肯定表达，以用户肯定要查询的部分为准。
+- 示例：“不要查天气，只查火车票” => ticket_query，只调用 ticket_agent。
+- 示例：“不用看车票，只看天气” => weather_query，只调用 weather_agent。
 
 槽位提取规则：
 - departure_city 表示出发城市
@@ -241,7 +318,7 @@ def build_analyze_prompt(user_query: str) -> str:
 """
 
 
-def analyze_query(user_query: str) -> dict[str, Any]:
+def analyze_query(user_query: str, trace_id: str | None = None) -> dict[str, Any]:
     prompt = build_analyze_prompt(user_query)
-    raw_output = chat_with_qwen(prompt)
+    raw_output = chat_with_qwen(prompt, trace_id=trace_id)
     return _normalize_analysis(user_query, extract_json(raw_output))

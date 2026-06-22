@@ -45,9 +45,16 @@ def _get_slots_from_task(task: Task) -> dict[str, Any]:
     # 2. task.metadata = {"slots": {"city": "东京", "fx_date": "2026-06-20"}}
     slots = metadata.get("slots", metadata)
 
+    # 兼容多种字段命名：本项目 Router 发送标准字段（city / fx_date），
+    # 同时允许外部 A2A client 使用 date / weather_date 等别名，
+    # 提升 Weather Agent 被独立调用时的鲁棒性。
     return {
         "city": slots.get("city"),
-        "fx_date": slots.get("fx_date") or slots.get("date") or slots.get("weather_date"),
+        "fx_date": (
+            slots.get("fx_date")
+            or slots.get("date")
+            or slots.get("weather_date")
+        ),
     }
 
 

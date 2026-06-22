@@ -38,6 +38,9 @@ def _get_slots_from_task(task: Task) -> dict[str, Any]:
     metadata = task.metadata or {}
     slots = metadata.get("slots", metadata)
 
+    # 兼容多种字段命名：本项目 Router 发送标准字段（departure_city 等），
+    # 同时允许外部 A2A client 使用 origin/from、destination/to、date 等别名，
+    # 提升 Ticket Agent 被独立调用时的鲁棒性。
     return {
         "departure_city": (
             slots.get("departure_city")
