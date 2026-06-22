@@ -8,6 +8,11 @@ from a2a_agents.weather_agent.card import (
     create_weather_agent_card,
 )
 from a2a_agents.weather_agent.handler import handle_weather_task
+from common.logger import get_logger, log_event
+
+
+AGENT_NAME = "weather_agent"
+logger = get_logger(__name__)
 
 
 class WeatherAgentServer(A2AServer):
@@ -19,13 +24,30 @@ class WeatherAgentServer(A2AServer):
     """
 
     def handle_task(self, task: Task) -> Task:
-        print("[WeatherAgent] Received task:")
-        print(task.to_dict())
+        metadata = task.metadata or {}
+        trace_id = metadata.get("trace_id")
+        slots = metadata.get("slots", {})
+
+        log_event(
+            logger,
+            "agent_task_received",
+            trace_id,
+            agent=AGENT_NAME,
+            slots=slots,
+        )
 
         result_task = handle_weather_task(task)
 
-        print("[WeatherAgent] Finished task:")
-        print(result_task.to_dict())
+        artifacts = result_task.artifacts or []
+        statuses = [a.get("status") for a in artifacts if isinstance(a, dict)]
+        log_event(
+            logger,
+            "agent_task_finished",
+            trace_id,
+            agent=AGENT_NAME,
+            artifact_count=len(artifacts),
+            statuses=statuses,
+        )
 
         return result_task
 
@@ -38,7 +60,14 @@ def main():
         google_a2a_compatible=True,
     )
 
-    print(f"[WeatherAgent] Starting server at http://{WEATHER_AGENT_HOST}:{WEATHER_AGENT_PORT}")
+    log_event(
+        logger,
+        "agent_server_start",
+        None,
+        agent=AGENT_NAME,
+        host=WEATHER_AGENT_HOST,
+        port=WEATHER_AGENT_PORT,
+    )
     run_server(
         server,
         host=WEATHER_AGENT_HOST,

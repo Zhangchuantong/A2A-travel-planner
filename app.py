@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import json
 
 import streamlit as st
@@ -14,12 +15,18 @@ WELCOME_MESSAGE = (
 
 
 def run_async(coro):
+    # 仅在“当前线程已有事件循环在运行”这一特定场景下走备用路径，
+    # 否则正常用 asyncio.run。这样协程内部抛出的 RuntimeError 会原样向上抛出，
+    # 不会被误捕获后重跑同一个已 await 的协程（导致 “cannot reuse coroutine”）。
     try:
-        return asyncio.run(coro)
+        asyncio.get_running_loop()
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(coro)
+        # 没有正在运行的事件循环：正常路径。
+        return asyncio.run(coro)
+
+    # 已经处于事件循环中：在独立线程里运行，避免复用协程。
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        return executor.submit(asyncio.run, coro).result()
 
 
 def build_followup_query(
@@ -107,7 +114,7 @@ def process_query(raw_input: str) -> tuple[str, dict]:
     st.session_state.pending_query = None
     st.session_state.pending_question = None
 
-    if status == "success":
+    if status in {"success", "partial_success"}:
         return (
             result.get(
                 "final_answer",
@@ -119,6 +126,13 @@ def process_query(raw_input: str) -> tuple[str, dict]:
     if status == "no_supported_agent":
         return (
             "这个问题暂时超出了我的能力范围。目前我可以帮助你查询天气和火车票。",
+            result,
+        )
+
+    if status == "agent_failed":
+        return (
+            "抱歉，刚才查询天气或车票的服务暂时出问题了，没能拿到结果。"
+            "请确认相关服务已启动，稍后再试一次。",
             result,
         )
 

@@ -56,6 +56,7 @@ def generate_final_answer(
     user_query: str,
     analysis: dict[str, Any],
     artifacts: list[dict[str, Any]],
+    trace_id: str | None = None,
 ) -> str:
     """
     Generate final natural language answer from agent artifacts.
@@ -66,4 +67,12 @@ def generate_final_answer(
         artifacts=artifacts,
     )
 
-    return chat_with_qwen(prompt, temperature=0.3)
+    return chat_with_qwen(
+        prompt,
+        temperature=0.3,
+        trace_id=trace_id,
+        system_prompt=(
+            "你是一个友好、专业的旅行规划助手。请用自然、口语化的中文回答用户，"
+            "不要输出 JSON，不要使用代码块，不要提及任何内部技术名词。"
+        ),
+    )

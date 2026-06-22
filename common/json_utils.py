@@ -19,8 +19,13 @@ def extract_json(text: str) -> dict[str, Any]:
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        match = re.search(r"\{.*\}", text, re.DOTALL)
-        if not match:
-            raise ValueError(f"No JSON object found in LLM output: {text}")
+        decoder = json.JSONDecoder()
+        for match in re.finditer(r"\{", text):
+            try:
+                obj, _ = decoder.raw_decode(text[match.start() :])
+            except json.JSONDecodeError:
+                continue
+            if isinstance(obj, dict):
+                return obj
 
-        return json.loads(match.group(0))
+        raise ValueError(f"No JSON object found in LLM output: {text}")

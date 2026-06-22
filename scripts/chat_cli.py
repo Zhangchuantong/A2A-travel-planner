@@ -78,6 +78,11 @@ async def handle_query(user_query: str):
             print("当前问题没有匹配到支持的 Agent。你可以尝试查询天气、车票或景点。")
             return
 
+        if status == "agent_failed":
+            print("\n系统提示：")
+            print("查询天气或车票的服务暂时出问题了，没能拿到结果。请确认相关服务已启动后重试。")
+            return
+
         print("\n系统返回未知状态：")
         print(result)
         return
