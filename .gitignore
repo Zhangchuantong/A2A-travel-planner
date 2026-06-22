@@ -31,3 +31,8 @@ Thumbs.db
 build/
 dist/
 *.egg-info/
+
+# 评测结果：保留用例(cases)、报告(EVAL_REPORT)与基线(baseline)，忽略其余生成结果
+evaluation/router_eval_results*.json
+!evaluation/router_eval_results_100_baseline.json
+evaluation/archive/
